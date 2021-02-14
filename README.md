@@ -1,6 +1,8 @@
 # dedup
 Compares files by size, and crc32. Outputs json result with `-json`
 
+![screenshot](material/screenshot.png)
+
 ## Features and TODOs
 - [x] handle case where two files have exact same size but different content
 - [ ] configurable filter
