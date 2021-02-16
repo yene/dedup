@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -35,7 +36,7 @@ type File struct {
 	Size      int64  `json:"size"`
 	SizeHuman string `json:"sizehuman"`
 	Duplicate bool   `json:"-"`
-	CRC32Hash string `json:"crc32"`
+	Hash      string `json:"hash"`
 }
 
 type Stats struct {
@@ -50,6 +51,7 @@ type Stats struct {
 func main() {
 	dirnamePtr := flag.String("d", "", "starting directory")
 	jsonResultPtr := flag.Bool("json", false, "output result as json")
+	crc32Ptr := flag.Bool("crc32", false, "use crc32 instead of sha265 to be maybe faster")
 	minFileSizePtr := flag.Int("minsize", int(30*MiB), "minimum filesize in bytes, default 30MiB")
 	flag.Parse()
 
@@ -82,7 +84,7 @@ func main() {
 			size := s.Size()
 			stat.SeenFiles = stat.SeenFiles + 1
 			if size > int64(minFileSize) {
-				f := File{Path: osPathname, Size: size, SizeHuman: ByteCountSI(size), CRC32Hash: ""}
+				f := File{Path: osPathname, Size: size, SizeHuman: ByteCountSI(size), Hash: ""}
 				// log.Printf("%s %s\n", de.ModeType(), osPathname)
 				files = append(files, f)
 			}
@@ -130,12 +132,22 @@ func main() {
 	hm := make(map[string][]File)
 	for index, _ := range duplicateFiles {
 		f := duplicateFiles[index]
-		hash, err := CRC32Hash(f.Path)
-		if err != nil {
-			log.Println(err)
-			continue
+		var hash string
+		if *crc32Ptr {
+			hash, err = CRC32Hash(f.Path)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+		} else {
+			hash, err = Sha256Hash(f.Path)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
 		}
-		f.CRC32Hash = hash
+
+		f.Hash = hash
 		val, exists := hm[hash]
 		if !exists {
 			val = []File{}
@@ -166,6 +178,21 @@ func main() {
 		jb, _ := json.MarshalIndent(hm, "", "  ")
 		fmt.Println(string(jb))
 	}
+}
+
+func Sha256Hash(filePath string) (string, error) {
+	var sha256string string
+	file, err := os.Open(filePath)
+	if err != nil {
+		return sha256string, err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return sha256string, err
+	}
+	sha256string = fmt.Sprintf("%x", hash.Sum(nil))
+	return sha256string, nil
 }
 
 func CRC32Hash(filePath string) (string, error) {

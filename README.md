@@ -1,5 +1,5 @@
 # dedup
-Compares files by size, and crc32. Outputs json result with `-json`
+Compares files by size, and hash. Outputs json result with `-json`
 
 ![screenshot](material/screenshot.png)
 
